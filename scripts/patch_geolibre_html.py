@@ -70,11 +70,9 @@ def main() -> None:
         # GeoLibre's Layer Swipe plugin retains its last state in the embedded
         # viewer.  Reset it explicitly so a visitor's earlier swipe session
         # cannot leave a comparison divider over this single-map project.
-        # Keep the plugin in the project activation list so GeoLibre actually
-        # applies the inactive state below.  If omitted, an already-running
-        # embedded viewer can retain its prior SwipeControl instance/state.
-        if "maplibre-gl-swipe" not in active:
-            active.append("maplibre-gl-swipe")
+        # SwipeControl's `active: false` state only locks its divider; removing
+        # the control requires deactivating the plugin itself.
+        active[:] = [plugin_id for plugin_id in active if plugin_id != "maplibre-gl-swipe"]
         settings["maplibre-gl-swipe"] = {
             "orientation": "vertical",
             "position": 50,
@@ -122,6 +120,25 @@ def main() -> None:
     patched, count = PROJECT_RE.subn(replacement, document, count=1)
     if count != 1:
         raise SystemExit("Could not find exactly one embedded GeoLibre project in the HTML")
+
+    # The hosted app can finish activating its default plugins just after the
+    # initial embed handshake. Reapply the project after startup so plugins not
+    # listed in activePluginIds (notably Layer Swipe) are reliably deactivated.
+    one_shot = """    frame.contentWindow.postMessage(
+      { type: "geolibre:load-project", project: project, seq: 1 },
+      viewerOrigin
+    );"""
+    repeated = one_shot + """
+    window.setTimeout(function () {
+      if (!frame.contentWindow) return;
+      frame.contentWindow.postMessage(
+        { type: "geolibre:load-project", project: project, seq: 2 },
+        viewerOrigin
+      );
+    }, 1500);"""
+    if one_shot not in patched:
+        raise SystemExit("Could not find GeoLibre embed load call")
+    patched = patched.replace(one_shot, repeated, 1)
 
     output = args.output or args.html.with_name(f"{args.html.stem}-fixed.html")
     output.write_text(patched, encoding="utf-8")
