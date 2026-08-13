@@ -70,7 +70,11 @@ def main() -> None:
         # GeoLibre's Layer Swipe plugin retains its last state in the embedded
         # viewer.  Reset it explicitly so a visitor's earlier swipe session
         # cannot leave a comparison divider over this single-map project.
-        active[:] = [plugin_id for plugin_id in active if plugin_id != "maplibre-gl-swipe"]
+        # Keep the plugin in the project activation list so GeoLibre actually
+        # applies the inactive state below.  If omitted, an already-running
+        # embedded viewer can retain its prior SwipeControl instance/state.
+        if "maplibre-gl-swipe" not in active:
+            active.append("maplibre-gl-swipe")
         settings["maplibre-gl-swipe"] = {
             "orientation": "vertical",
             "position": 50,
