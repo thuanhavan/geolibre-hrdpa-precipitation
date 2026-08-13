@@ -1,0 +1,14 @@
+{
+  "name": "HRDPA daily precipitation — Prairies",
+  "url": "output/hrdpa_prairies_daily.zarr",
+  "options": {
+    "variable": "precipitation",
+    "selector": { "time": "2026-08-05" },
+    "clim": [0, 50],
+    "colormap": "blues",
+    "opacity": 0.85,
+    "zarrVersion": 2,
+    "crs": "EPSG:3978",
+    "spatialDimensions": { "lat": "y", "lon": "x" }
+  }
+}

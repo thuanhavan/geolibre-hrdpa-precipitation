@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>HRDPA Daily Precipitation</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    html,body,#map{height:100%;margin:0} body{font:14px system-ui,sans-serif;background:#111827}
+    .panel{position:absolute;z-index:1000;left:50%;bottom:24px;transform:translateX(-50%);width:min(720px,calc(100% - 32px));box-sizing:border-box;padding:14px 16px;background:#111827eb;color:#fff;border:1px solid #475569;border-radius:10px;box-shadow:0 8px 30px #0008}
+    .row{display:flex;align-items:center;gap:12px}.grow{flex:1}.date{min-width:110px;text-align:center;font-weight:700;font-size:16px}.status{font-size:12px;color:#cbd5e1;margin-top:7px;text-align:center}
+    button{border:1px solid #64748b;border-radius:6px;background:#2563eb;color:#fff;padding:7px 13px;cursor:pointer} input[type=range]{width:100%}
+    .legend{position:absolute;z-index:1000;right:18px;bottom:125px;background:#111827e8;color:#fff;padding:10px 12px;border-radius:8px;border:1px solid #475569}
+    .bar{width:220px;height:14px;margin:6px 0;background:linear-gradient(90deg,#f7fbff,#c6dbef,#6baed6,#2171b5,#08306b)}
+    .ticks{display:flex;justify-content:space-between;font-size:11px}.title{font-weight:700}.leaflet-control-attribution{font-size:10px}
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="legend"><div class="title">Daily precipitation (mm)</div><div class="bar"></div><div class="ticks"><span>10</span><span>25</span><span>40</span><span>55</span><span>70</span></div></div>
+  <div class="panel">
+    <div class="row"><button id="play">Play</button><input class="grow" id="slider" type="range" min="0" max="7" value="0" step="1"><div class="date" id="date"></div></div>
+    <div class="status" id="status">Loading...</div>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js"></script>
+  <script>
+    const dates=['2026-08-05','2026-08-06','2026-08-07','2026-08-08','2026-08-09','2026-08-10','2026-08-11','2026-08-12'];
+    const colors=['#f7fbff','#c6dbef','#6baed6','#2171b5','#08306b'].map(h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5),16)]);
+    const map=L.map('map',{preferCanvas:true}).setView([54,-106],5);
+    L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',{maxZoom:20,attribution:'Google'}).addTo(map);
+    let overlay=null,timer=null,requestId=0;
+    const slider=document.getElementById('slider'), dateEl=document.getElementById('date'), status=document.getElementById('status'), play=document.getElementById('play');
+    const mercatorToLatLng=(x,y)=>[Math.atan(Math.sinh(y/6378137))*180/Math.PI,x/6378137*180/Math.PI];
+    function ramp(v){
+      const t=Math.max(0,Math.min(1,(v-10)/60)), p=t*(colors.length-1), i=Math.min(colors.length-2,Math.floor(p)), f=p-i;
+      return colors[i].map((c,k)=>Math.round(c+(colors[i+1][k]-c)*f));
+    }
+    async function showFrame(index){
+      const id=++requestId, day=dates[index]; dateEl.textContent=day; status.textContent='Loading '+day+'...';
+      try{
+        const response=await fetch(`/data/cog_web_10mm/hrdpa_${day}.tif`); if(!response.ok) throw new Error(`HTTP ${response.status}`);
+        const tif=await GeoTIFF.fromArrayBuffer(await response.arrayBuffer()), image=await tif.getImage();
+        const width=image.getWidth(),height=image.getHeight(),raster=(await image.readRasters({interleave:true}));
+        const canvas=document.createElement('canvas'); canvas.width=width;canvas.height=height;const ctx=canvas.getContext('2d'),pixels=ctx.createImageData(width,height);
+        for(let n=0;n<raster.length;n++){const v=raster[n],o=n*4;if(Number.isFinite(v)&&v>=10&&v!==-9999){const c=ramp(v);pixels.data[o]=c[0];pixels.data[o+1]=c[1];pixels.data[o+2]=c[2];pixels.data[o+3]=220;}}
+        ctx.putImageData(pixels,0,0); if(id!==requestId)return;
+        const box=image.getBoundingBox(), sw=mercatorToLatLng(box[0],box[1]), ne=mercatorToLatLng(box[2],box[3]);
+        if(overlay)map.removeLayer(overlay); overlay=L.imageOverlay(canvas.toDataURL('image/png'),[sw,ne],{opacity:.9}).addTo(map);
+        if(!map._hrdpaFit){map.fitBounds([sw,ne]);map._hrdpaFit=true;} status.textContent='Values below 10 mm are transparent';
+      }catch(error){status.textContent='Could not load '+day+': '+error.message;console.error(error);}
+    }
+    slider.addEventListener('input',()=>showFrame(+slider.value));
+    play.addEventListener('click',()=>{if(timer){clearInterval(timer);timer=null;play.textContent='Play';return;}play.textContent='Pause';timer=setInterval(()=>{slider.value=(+slider.value+1)%dates.length;showFrame(+slider.value)},2000)});
+    showFrame(0);
+  </script>
+</body>
+</html>

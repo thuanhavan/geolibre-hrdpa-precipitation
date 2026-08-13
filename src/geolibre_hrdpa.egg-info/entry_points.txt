@@ -1,0 +1,2 @@
+[console_scripts]
+hrdpa-pipeline = hrdpa_pipeline.cli:main

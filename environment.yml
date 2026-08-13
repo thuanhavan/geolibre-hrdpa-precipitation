@@ -1,0 +1,17 @@
+name: geolibre-hrdpa
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - earthengine-api
+  - geedim
+  - rasterio
+  - xarray
+  - pandas
+  - zarr<3
+  - numcodecs<0.16
+  - pytest
+  - pip
+  - pip:
+      - -e .
+
