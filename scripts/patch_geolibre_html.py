@@ -67,6 +67,19 @@ def main() -> None:
         if "maplibre-gl-components" not in active:
             active.append("maplibre-gl-components")
         settings = plugins.setdefault("settings", {})
+        # GeoLibre's Layer Swipe plugin retains its last state in the embedded
+        # viewer.  Reset it explicitly so a visitor's earlier swipe session
+        # cannot leave a comparison divider over this single-map project.
+        active[:] = [plugin_id for plugin_id in active if plugin_id != "maplibre-gl-swipe"]
+        settings["maplibre-gl-swipe"] = {
+            "orientation": "vertical",
+            "position": 50,
+            "collapsed": True,
+            "active": False,
+            "leftLayers": [],
+            "rightLayers": [],
+            "isDragging": False,
+        }
         settings["maplibre-gl-components"] = {
             "colorbar": {
                 "mode": "custom",
