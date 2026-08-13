@@ -23,6 +23,11 @@ def main() -> None:
         action="store_true",
         help="replace duplicate Time Slider sources with the known HRDPA COG source",
     )
+    parser.add_argument(
+        "--cog-url",
+        default="http://127.0.0.1:8000/data/cog_web_10mm/hrdpa_{date:YYYY-MM-DD}.tif",
+        help="COG URL template used with --normalize-hrdpa",
+    )
     args = parser.parse_args()
 
     document = args.html.read_text(encoding="utf-8")
@@ -37,7 +42,7 @@ def main() -> None:
                 "type": "cog",
                 "id": existing.get("id", "hrdpa-precipitation"),
                 "name": "HRDPA Precipitation",
-                "url": "http://127.0.0.1:8000/data/cog_web_10mm/hrdpa_{date:YYYY-MM-DD}.tif",
+                "url": args.cog_url,
                 "engine": "wasm",
                 "colormap": "blues",
                 "rescale": [10, 70],
@@ -57,6 +62,42 @@ def main() -> None:
                 "granularities": ["day"],
             }
         )
+        plugins = project.setdefault("plugins", {})
+        active = plugins.setdefault("activePluginIds", [])
+        if "maplibre-gl-components" not in active:
+            active.append("maplibre-gl-components")
+        settings = plugins.setdefault("settings", {})
+        settings["maplibre-gl-components"] = {
+            "colorbar": {
+                "mode": "custom",
+                "colormap": "blues",
+                "customColors": "#f7fbff, #c6dbef, #6baed6, #2171b5, #08306b",
+                "vmin": 10,
+                "vmax": 70,
+                "label": "Daily precipitation",
+                "units": "mm",
+                "orientation": "horizontal",
+                "colorbarPosition": "bottom-right",
+                "visible": True,
+                "collapsed": False,
+                "hasColorbar": True,
+                "selectedColorbarIndex": 0,
+                "colorbars": [
+                    {
+                        "mode": "custom",
+                        "colormap": "blues",
+                        "customColors": "#f7fbff, #c6dbef, #6baed6, #2171b5, #08306b",
+                        "vmin": 10,
+                        "vmax": 70,
+                        "label": "Daily precipitation",
+                        "units": "mm",
+                        "orientation": "horizontal",
+                        "colorbarPosition": "bottom-right",
+                    }
+                ],
+                "stackOrientation": "vertical",
+            }
+        }
 
     # Escape '<' so project strings cannot prematurely terminate the script tag.
     payload = json.dumps(project, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
