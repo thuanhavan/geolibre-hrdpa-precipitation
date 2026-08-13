@@ -6,6 +6,7 @@ import argparse
 import json
 import re
 from pathlib import Path
+from urllib.parse import urlencode
 
 PROJECT_RE = re.compile(
     r'(<script type="application/json" id="geolibre-project">)(.*?)(</script>)',
@@ -28,6 +29,8 @@ def main() -> None:
         default="http://127.0.0.1:8000/data/cog_web_10mm/hrdpa_{date:YYYY-MM-DD}.tif",
         help="COG URL template used with --normalize-hrdpa",
     )
+    parser.add_argument("--project-output", type=Path, help="also write the normalized project JSON")
+    parser.add_argument("--viewer-project-url", help="load this project URL through GeoLibre's native URL loader")
     args = parser.parse_args()
 
     document = args.html.read_text(encoding="utf-8")
@@ -120,6 +123,25 @@ def main() -> None:
     patched, count = PROJECT_RE.subn(replacement, document, count=1)
     if count != 1:
         raise SystemExit("Could not find exactly one embedded GeoLibre project in the HTML")
+
+    if args.project_output:
+        args.project_output.parent.mkdir(parents=True, exist_ok=True)
+        args.project_output.write_text(
+            json.dumps(project, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+
+    if args.viewer_project_url:
+        viewer_src = "https://web.geolibre.app/?" + urlencode(
+            {"url": args.viewer_project_url, "layout": "viewer", "welcome": "0"}
+        )
+        patched, iframe_count = re.subn(
+            r'(<iframe\s+id="geolibre-frame"\s+src=")[^"]*(")',
+            lambda match: match.group(1) + viewer_src.replace("&", "&amp;") + match.group(2),
+            patched,
+            count=1,
+        )
+        if iframe_count != 1:
+            raise SystemExit("Could not update GeoLibre iframe URL")
 
     # The hosted app can finish activating its default plugins just after the
     # initial embed handshake. Reapply the project after startup so plugins not
