@@ -79,7 +79,7 @@ def main() -> None:
                 "orientation": "horizontal",
                 "colorbarPosition": "bottom-right",
                 "visible": True,
-                "collapsed": False,
+                "collapsed": True,
                 "hasColorbar": True,
                 "selectedColorbarIndex": 0,
                 "colorbars": [
